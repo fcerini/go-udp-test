@@ -10,6 +10,7 @@ import (
 )
 
 var gloClients map[string]time.Time
+var udpconn *net.UDPConn
 
 func main() {
 	go udpListenLoop()
@@ -30,11 +31,18 @@ func udpListenLoop() {
 	host := "0.0.0.0"
 	port := 64749
 
+	var err error
 	// Setup our UDP listener
-	udpconn, _ := net.ListenUDP("udp",
+	udpconn, err = net.ListenUDP("udp",
 		&net.UDPAddr{
 			IP:   net.ParseIP(host),
 			Port: port})
+
+	if err != nil {
+		fmt.Println("ERR ListenUDP:", err)
+		return
+
+	}
 
 	fmt.Println("UDP SERVER Listening in ", udpconn.LocalAddr())
 
@@ -56,7 +64,11 @@ func udpListenLoop() {
 		_, ok = gloClients[udpaddr.String()]
 		if !ok {
 			fmt.Println("Nuevo Cliente ", udpaddr.String())
-			return
+		}
+
+		_, err = udpconn.WriteTo(buf, udpaddr)
+		if err != nil {
+			fmt.Println("ERR udpconn.WriteTo: ", err)
 		}
 
 		gloClients[udpaddr.String()] = time.Now()
@@ -79,24 +91,29 @@ func send() {
 
 		for k := range gloClients {
 
-			s, err := net.ResolveUDPAddr("udp4", k)
+			udpaddr, err := net.ResolveUDPAddr("udp4", k)
 			if err != nil {
 				log.Fatal("ERR Broadcast ResolveUDPAddr", err)
 				return
 			}
-			auxConn, err := net.DialUDP("udp4", nil, s)
-			if err != nil {
-				log.Fatal("ERR Broadcast DialUDP", err)
-				return
-			}
 
-			defer auxConn.Close()
+			udpconn.WriteTo(buf, udpaddr)
 
-			_, err = auxConn.Write(buf)
-			if err != nil {
-				fmt.Println("ERR APP.Broadcasts..Conn.Write: ", err)
-			}
+			/*
+				auxConn, err := net.DialUDP("udp4", nil, s)
+				if err != nil {
+					log.Fatal("ERR Broadcast DialUDP", err)
+					return
+				}
 
+				defer auxConn.Close()
+
+				_, err = auxConn.Write(buf)
+				if err != nil {
+					fmt.Println("ERR APP.Broadcasts..Conn.Write: ", err)
+				}
+			*/
+			log.Printf("Enviando %v", udpaddr.String())
 		}
 	}
 }
