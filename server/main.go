@@ -9,10 +9,14 @@ import (
 	"time"
 )
 
+var gloApp AppConfig
 var gloClients map[string]time.Time
 var udpconn *net.UDPConn
 
 func main() {
+	// carga el config.json
+	gloApp.Load()
+
 	go udpListenLoop()
 	for {
 		time.Sleep(1 * time.Second)
@@ -29,7 +33,7 @@ func udpListenLoop() {
 	gloClients = make(map[string]time.Time)
 
 	host := "0.0.0.0"
-	port := 64749
+	port := gloApp.Puerto
 
 	var err error
 	// Setup our UDP listener
@@ -77,17 +81,22 @@ func udpListenLoop() {
 
 func send() {
 
-	var buf []byte
-	for i := 0; i < 100; i++ {
+	log.Printf("Enviando %v paquetes. Delay %v",
+		gloApp.CantidadPaquetes, gloApp.Delay)
 
-		buf = []byte{byte(i), 9, 9, 9, 9, 9, 9, 9, 9, 9,
+	var buf []byte
+	for i := 0; i < gloApp.CantidadPaquetes; i++ {
+
+		buf = []byte{byte(i % 100), 9, 9, 9, 9, 9, 9, 9, 9, 9,
+			9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+			9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
 			9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
 			9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
 			9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
 			9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
 			9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
 		}
-		time.Sleep(25 * time.Millisecond)
+		time.Sleep(time.Duration(gloApp.Delay) * time.Millisecond)
 
 		for k := range gloClients {
 
@@ -98,22 +107,9 @@ func send() {
 			}
 
 			udpconn.WriteTo(buf, udpaddr)
-
-			/*
-				auxConn, err := net.DialUDP("udp4", nil, s)
-				if err != nil {
-					log.Fatal("ERR Broadcast DialUDP", err)
-					return
-				}
-
-				defer auxConn.Close()
-
-				_, err = auxConn.Write(buf)
-				if err != nil {
-					fmt.Println("ERR APP.Broadcasts..Conn.Write: ", err)
-				}
-			*/
-			log.Printf("Enviando %v", udpaddr.String())
+			if i == 1 {
+				log.Print(udpaddr.String())
+			}
 		}
 	}
 }
